@@ -1,0 +1,75 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>锻造大师</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --safe-area-inset-bottom: env(safe-area-inset-bottom);
+        }
+        body {
+            font-family: "Helvetica Neue", Helvetica, Arial, "Microsoft YaHei", "微软雅黑", "SimHei", "黑体", sans-serif;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            overscroll-behavior-y: contain;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            font-size: 16px; /* 提升基础字号 */
+        }
+        .quality-1 { color: #ffffff; text-shadow: 0 0 5px rgba(255,255,255,0.3); }
+        .quality-2 { color: #4ade80; text-shadow: 0 0 5px rgba(74,222,128,0.3); }
+        .quality-3 { color: #facc15; text-shadow: 0 0 10px rgba(250,204,21,0.5); }
+        .bg-quality-1 { background-color: #333; border: 1px solid #666; }
+        .bg-quality-2 { background-color: #064e3b; border: 1px solid #059669; }
+        .bg-quality-3 { background-color: #451a03; border: 1px solid #d97706; }
+        .forge-slot {
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px dashed #444;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+        .forge-slot.filled {
+            border: 2px solid #666;
+            background: #2a2a2a;
+        }
+        .stat-card {
+            background: linear-gradient(145deg, #262626, #1f1f1f);
+            box-shadow: 5px 5px 10px #171717, -5px -5px 10px #2d2d2d;
+        }
+        nav {
+            padding-bottom: calc(0.5rem + var(--safe-area-inset-bottom)) !important;
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    <div id="root"></div>
+    <script type="module" src="index.tsx"></script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
