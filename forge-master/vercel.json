@@ -1,0 +1,15 @@
+
+{
+  "version": 2,
+  "public": true,
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "rewrites": [
+    { "source": "/index.tsx", "destination": "/index.tsx" },
+    { "source": "/App.tsx", "destination": "/App.tsx" },
+    { "source": "/types.ts", "destination": "/types.ts" },
+    { "source": "/constants.ts", "destination": "/constants.ts" },
+    { "source": "/services/(.*)", "destination": "/services/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
