@@ -42,6 +42,9 @@ const App: React.FC = () => {
   const floatingIdCounter = useRef(0);
   const [dungeon, setDungeon] = useState<(DungeonState & { currentEvent?: string; isProcessing?: boolean; lastHealDepth: number }) | null>(null);
   const [selectedStartFloor, setSelectedStartFloor] = useState(0);
+  
+  // New state for bag filter
+  const [bagFilter, setBagFilter] = useState<'ALL' | 'WEAPON' | 'ARMOR'>('ALL');
 
   useEffect(() => {
     const savedData = localStorage.getItem('shingbing_forge_save_v2');
@@ -58,6 +61,13 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('shingbing_forge_save_v2', JSON.stringify(player));
   }, [player]);
+
+  // Reset filter when opening bag
+  useEffect(() => {
+    if (activeTab === 'BAG') {
+      setBagFilter('ALL');
+    }
+  }, [activeTab]);
 
   const resetGame = () => {
     if (window.confirm("确定要删除所有进度重新开始吗？")) {
@@ -81,6 +91,12 @@ const App: React.FC = () => {
     applyItemStats(player.equippedArmor);
     return stats;
   }, [player]);
+
+  // Filter inventory based on selection
+  const filteredInventory = useMemo(() => {
+    if (bagFilter === 'ALL') return player.inventory;
+    return player.inventory.filter(item => item.type === bagFilter);
+  }, [player.inventory, bagFilter]);
 
   const addFloatingText = (text: string, type: 'damage' | 'heal' | 'exp', isPlayer: boolean) => {
     const id = ++floatingIdCounter.current;
@@ -263,11 +279,15 @@ const App: React.FC = () => {
       } 
       else {
         const foundRoll = Math.random();
-        const foundGold = Math.floor(Math.random() * 15 * depthBoost);
+        // 稍微提升副本金币产出，适应物价上涨 (15 -> 20)
+        const foundGold = Math.floor(Math.random() * 20 * depthBoost);
         const foundExp = Math.floor((12 + Math.random() * 6) * expScale);
-        let matIndex = 0;
-        if (foundRoll > 0.98) matIndex = 2;
-        else if (foundRoll > 0.7) matIndex = 1;
+        let matIndex = 0; // 默认普通
+        
+        // 搜刮掉率调整: 5% 稀有, 30% 优质, 65% 普通
+        if (foundRoll > 0.95) matIndex = 2; // Rare (Index 2 in MATERIALS)
+        else if (foundRoll > 0.65) matIndex = 1; // Refined (Index 1)
+        
         const newMat = { ...MATERIALS[matIndex], id: Math.random().toString() };
         
         gainExp(foundExp);
@@ -343,10 +363,12 @@ const App: React.FC = () => {
         if (dropRoll < 0.5) {
           newItem = generateEquipment(Math.random() > 0.5 ? 'WEAPON' : 'ARMOR', [Quality.Common, Quality.Refined, Quality.Common], player.level);
         } else {
+          // 怪物掉落材料概率调整: 5% 稀有, 30% 优质, 65% 普通
           const matRoll = Math.random();
           let matIndex = 0;
-          if (matRoll > 0.95) matIndex = 2; 
-          else if (matRoll > 0.7) matIndex = 1; 
+          if (matRoll > 0.95) matIndex = 2; // Rare (5%)
+          else if (matRoll > 0.65) matIndex = 1; // Refined (30%)
+          
           newMat = { ...MATERIALS[matIndex], id: Math.random().toString() };
         }
       }
@@ -563,9 +585,35 @@ const App: React.FC = () => {
               </div>
             </div>
             <div className="bg-zinc-800 p-6 rounded-2xl border border-zinc-700">
-              <h2 className="text-2xl mb-6 font-bold text-zinc-400 flex items-center"><i className="fas fa-box-open mr-2 text-zinc-500"></i> 行囊存货</h2>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                <h2 className="text-2xl font-bold text-zinc-400 flex items-center"><i className="fas fa-box-open mr-2 text-zinc-500"></i> 行囊存货</h2>
+                <div className="flex bg-zinc-900 p-1 rounded-lg border border-zinc-700/50">
+                  {[
+                    { key: 'ALL', label: '全部' },
+                    { key: 'WEAPON', label: '武器' },
+                    { key: 'ARMOR', label: '防具' }
+                  ].map((opt) => (
+                    <button
+                      key={opt.key}
+                      onClick={() => setBagFilter(opt.key as any)}
+                      className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${
+                        bagFilter === opt.key 
+                          ? 'bg-zinc-700 text-white shadow-sm' 
+                          : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {player.inventory.map(item => {
+                {filteredInventory.length === 0 && (
+                  <div className="col-span-full text-center py-12 text-zinc-600 italic border-2 border-dashed border-zinc-700/50 rounded-xl">
+                    {bagFilter === 'ALL' ? '这里空空如也...' : '没有找到对应类型的装备...'}
+                  </div>
+                )}
+                {filteredInventory.map(item => {
                   const isEquipped = player.equippedWeapon?.id === item.id || player.equippedArmor?.id === item.id;
                   return (
                     <div key={item.id} className={`bg-zinc-900 p-5 rounded-xl border flex flex-col hover:border-zinc-500 transition shadow-sm ${isEquipped ? 'border-blue-900/50' : 'border-zinc-800'}`}>
@@ -660,7 +708,7 @@ const App: React.FC = () => {
                     <div className="bg-zinc-800 p-4 rounded-xl border border-zinc-700 shadow-sm shrink-0">
                       <div className="flex justify-between text-sm font-black mb-2 text-zinc-400 tracking-widest uppercase">
                         <span className="flex items-center"><i className="fas fa-compass mr-2 text-red-500"></i> 第 {dungeon.depth} 关</span>
-                        <span className={stepsToBoss <= 3 ? "text-red-500 animate-pulse" : "text-yellow-500"}>
+                        <span className="text-yellow-500">
                            {stepsToBoss === 0 ? '首领 已现身' : `距 首领: ${stepsToBoss}`}
                         </span>
                       </div>

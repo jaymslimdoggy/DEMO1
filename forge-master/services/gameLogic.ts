@@ -69,8 +69,10 @@ export const generateEquipment = (type: EquipmentType, materials: Quality[], pla
   const namePrefix = resultQuality === Quality.Rare ? '传说' : (resultQuality === Quality.Refined ? '精炼' : '普通的');
   const typeName = type === 'WEAPON' ? '神兵' : '护甲';
   
-  const materialCosts = { [Quality.Common]: 10, [Quality.Refined]: 50, [Quality.Rare]: 200 };
+  // 更新成本计算以匹配 constants.ts 中的新价格 (10, 100, 2000)
+  const materialCosts = { [Quality.Common]: 10, [Quality.Refined]: 100, [Quality.Rare]: 2000 };
   const totalCost = materials.reduce((sum, q) => sum + materialCosts[q], 0);
+  // 调整售价系数，因为成本基数变大了，适当降低一点点倍率防止数值膨胀过快，但保证高价值
   const saleValue = Math.floor(totalCost * (0.6 + resultQuality * 0.1) * (1 + (playerLevel - 1) * 0.05));
 
   return {

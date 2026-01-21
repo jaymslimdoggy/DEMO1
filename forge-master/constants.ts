@@ -3,8 +3,8 @@ import { Material, Quality } from './types';
 
 export const MATERIALS: Material[] = [
   { id: 'm1', quality: Quality.Common, name: '普通的矿石', price: 10 },
-  { id: 'm2', quality: Quality.Refined, name: '优质的矿石', price: 50 },
-  { id: 'm3', quality: Quality.Rare, name: '稀有的矿石', price: 200 },
+  { id: 'm2', quality: Quality.Refined, name: '优质的矿石', price: 100 },
+  { id: 'm3', quality: Quality.Rare, name: '稀有的矿石', price: 2000 },
 ];
 
 export const STAT_CONFIG = {
