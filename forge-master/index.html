@@ -54,6 +54,19 @@
             border: 2px solid #666;
             background: #2a2a2a;
         }
+        .text-stroke {
+            -webkit-text-stroke: 1px rgba(0,0,0,0.8);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        @keyframes floatUp {
+            0% { transform: translate(var(--tw-translate-x), var(--tw-translate-y)) scale(0.5); opacity: 0; }
+            20% { transform: translate(var(--tw-translate-x), calc(var(--tw-translate-y) - 20px)) scale(1.2); opacity: 1; }
+            80% { transform: translate(var(--tw-translate-x), calc(var(--tw-translate-y) - 60px)) scale(1); opacity: 1; }
+            100% { transform: translate(var(--tw-translate-x), calc(var(--tw-translate-y) - 80px)) scale(0.9); opacity: 0; }
+        }
+        .animate-floatUp {
+            animation: floatUp 1s ease-out forwards;
+        }
         .stat-card {
             background: linear-gradient(145deg, #262626, #1f1f1f);
             box-shadow: 5px 5px 10px #171717, -5px -5px 10px #2d2d2d;

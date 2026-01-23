@@ -1,79 +1,411 @@
 
-import { Quality, Equipment, EquipmentType, Stat, Material } from '../types';
-import { STAT_CONFIG } from '../constants';
+import { Quality, Equipment, EquipmentType, Stat, Material, ForgeSession, MaterialEffectType } from '../types';
+import { STAT_CONFIG, FORGE_ACTIONS } from '../constants';
 
-export const generateEquipment = (type: EquipmentType, materials: Quality[], playerLevel: number = 1, isBossDrop: boolean = false): Equipment => {
-  const totalMaterialValue = materials.reduce((sum, q) => sum + q, 0);
-  const id = Math.random().toString(36).substr(2, 9);
-  
-  // Quality determination
-  let resultQuality = Quality.Common;
-  if (totalMaterialValue >= 7 || (isBossDrop && Math.random() > 0.5)) resultQuality = Quality.Rare;
-  else if (totalMaterialValue >= 4) resultQuality = Quality.Refined;
+// --- Helper to check effects ---
+const hasEffect = (materials: Material[], type: MaterialEffectType): Material | undefined => {
+    return materials.find(m => m.effectType === type);
+};
 
-  // 1、根据品质限制属性条数：白色2，绿色3，金色4
-  // 注意：原来的代码中statCount受材料价值限制，这里根据需求优化
-  const maxStatCount = resultQuality === Quality.Rare ? 4 : (resultQuality === Quality.Refined ? 3 : 2);
-  const statCount = Math.min(maxStatCount, Math.floor(totalMaterialValue / 1.5) + 1);
+// --- Forge Mini-Game Logic ---
+
+export const createForgeSession = (materials: Material[], playerLevel: number): ForgeSession => {
+  // 基础锻造耐久 58
+  let baseDurability = 58 + (playerLevel * 2); 
   
-  // 固定排序顺序定义
-  const weaponOrder: Stat['type'][] = ['ATK', 'CRIT', 'LIFESTEAL'];
-  const armorOrder: Stat['type'][] = ['HP', 'DEF', 'LIFESTEAL'];
-  const order = type === 'WEAPON' ? weaponOrder : armorOrder;
-  
-  // 增加池子确保即使抽4条也有足够选择
-  const shuffledPool = [...order].sort(() => 0.5 - Math.random());
-  const selectedKeys: Stat['type'][] = [];
-  
-  for (let i = 0; i < statCount; i++) {
-    // 允许属性重复以填满条数，或者扩展池子
-    selectedKeys.push(shuffledPool[i % shuffledPool.length]);
+  let costReductionPct = 0;
+  let scoreMult = 1.0;
+
+  materials.forEach(m => {
+    if (m.effectType === 'DURABILITY') baseDurability += m.effectValue;
+    if (m.effectType === 'COST_REDUCTION') costReductionPct += m.effectValue;
+    if (m.effectType === 'SCORE_MULT') scoreMult += m.effectValue;
+  });
+
+  // Cap cost reduction at 80% to prevent 0 cost loop exploits
+  costReductionPct = Math.min(0.80, costReductionPct);
+
+  return {
+    playerLevel,
+    maxDurability: baseDurability,
+    currentDurability: baseDurability,
+    progress: 0,
+    qualityScore: 0,
+    costModifier: costReductionPct,
+    scoreMultiplier: scoreMult,
+    quenchCooldown: 0,
+    turnCount: 0,
+    logs: ['锻造开始！请选择技艺...'],
+    status: 'ACTIVE',
+    materials,
+    activeDebuff: null,
+    durabilitySpent: 0,
+    momentum: 0,
+    polishCount: 0
+  };
+};
+
+export const executeForgeAction = (session: ForgeSession, action: 'LIGHT' | 'HEAVY' | 'QUENCH' | 'POLISH'): ForgeSession => {
+  const newSession = { ...session, turnCount: session.turnCount + 1 };
+  if (newSession.quenchCooldown > 0) newSession.quenchCooldown--;
+  const levelScale = 1 + (session.playerLevel * 0.03);
+
+  const effAmber = hasEffect(session.materials, 'SPECIAL_START_FREE');
+  const effGravity = hasEffect(session.materials, 'SPECIAL_HEAVY_FREE');
+  const effEcho = hasEffect(session.materials, 'SPECIAL_LIGHT_MULTI');
+  const effMithril = hasEffect(session.materials, 'SPECIAL_LIGHT_SCORE');
+  const effImpact = hasEffect(session.materials, 'SPECIAL_HEAVY_PROGRESS');
+  const effDiamond = hasEffect(session.materials, 'SPECIAL_POLISH_BUFF');
+  const effBlood = hasEffect(session.materials, 'SPECIAL_SPEND_BONUS');
+  const effBerserk = hasEffect(session.materials, 'SPECIAL_LOW_DURABILITY');
+  const effFrost = hasEffect(session.materials, 'SPECIAL_QUENCH_BUFF');
+  const effCrit = hasEffect(session.materials, 'SPECIAL_CRIT');
+
+  // Helper for cost calc
+  const calculateCost = (base: number) => {
+      let activeCost = base;
+      if (session.activeDebuff === 'HARDENED') activeCost *= 2;
+      
+      // Percentage reduction
+      activeCost = Math.floor(activeCost * (1 - session.costModifier));
+      return Math.max(1, activeCost); // Minimum 1 durability
+  };
+
+  if (action === 'POLISH') {
+     const [minCost, maxCost] = FORGE_ACTIONS.POLISH.costRange;
+     
+     // Diminishing Returns: Cost Logic
+     // 0: 1x, 1: 1.5x, 2+: 2x
+     const costPenaltyMult = session.polishCount === 0 ? 1 : session.polishCount === 1 ? 1.5 : 2;
+     
+     let rawCost = Math.floor((Math.random() * (maxCost - minCost + 1)) + minCost);
+     let actualCost = Math.floor(calculateCost(rawCost) * costPenaltyMult);
+
+     if (effAmber && session.turnCount < effAmber.effectValue) {
+        actualCost = 0;
+        newSession.logs = [`远古琥珀生效：前${effAmber.effectValue}回合免耗！`, ...newSession.logs];
+     }
+     
+     // Special Polish Logic check
+     let isCrit = false;
+     if (effCrit && Math.random() < effCrit.effectValue) isCrit = true;
+
+     let berserkBonus = 1.0;
+     if (effBerserk && (session.currentDurability / session.maxDurability) < 0.3) berserkBonus = 1.5;
+
+     newSession.currentDurability -= actualCost;
+     newSession.durabilitySpent += actualCost;
+
+     if (newSession.currentDurability <= 0) {
+        newSession.status = 'FAILURE';
+        newSession.logs = [`打磨用力过猛（消耗${actualCost}），神兵破碎了...`, ...session.logs];
+        return newSession;
+     }
+
+     const riskMultiplier = 1 + (actualCost / maxCost); 
+     let baseScore = actualCost * FORGE_ACTIONS.POLISH.scorePerDurability;
+     if (effDiamond) baseScore += actualCost * effDiamond.effectValue;
+
+     // Diminishing Returns: Score Logic
+     // 0: 100%, 1: 80%, 2+: 50%
+     const efficiencyMult = session.polishCount === 0 ? 1.0 : session.polishCount === 1 ? 0.8 : 0.5;
+     
+     // Momentum Logic
+     const momentumBonus = 1 + (session.momentum * 0.15); // +15% per stack
+
+     let actualScore = Math.floor(baseScore * session.scoreMultiplier * riskMultiplier * levelScale * berserkBonus * momentumBonus * efficiencyMult);
+     if (isCrit) actualScore *= 2;
+
+     newSession.qualityScore += actualScore;
+     
+     let logStr = `打磨(Lv.${session.polishCount+1})：消耗${actualCost}耐久`;
+     if (session.momentum > 0) logStr += ` [重势x${session.momentum}:+${Math.round(session.momentum*15)}%]`;
+     if (session.polishCount > 0) logStr += ` [效率${efficiencyMult*100}%]`;
+     logStr += `，分 +${actualScore}`;
+
+     if (isCrit) logStr += ' [暴击!]';
+     if (berserkBonus > 1) logStr += ' [狂战]';
+     
+     newSession.logs = [logStr, ...session.logs];
+     
+     // Consume Momentum and Increment Polish Count
+     newSession.momentum = 0;
+     newSession.polishCount++;
+
+     if (effBlood) {
+         const threshold = 20;
+         const prevSpent = session.durabilitySpent;
+         const currSpent = newSession.durabilitySpent;
+         if (Math.floor(currSpent / threshold) > Math.floor(prevSpent / threshold)) {
+             newSession.qualityScore += effBlood.effectValue;
+             newSession.logs = [`血燃石生效：耐久消耗达标，额外 +${effBlood.effectValue}分`, ...newSession.logs];
+         }
+     }
+     return newSession;
   }
 
-  selectedKeys.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  if (action === 'QUENCH') {
+    if (session.quenchCooldown > 0) return session;
+    const heal = Math.floor(session.maxDurability * 0.3);
+    newSession.currentDurability = Math.min(newSession.maxDurability, newSession.currentDurability + heal);
+    const debuffChanceMult = effFrost ? 0.5 : 1.0;
+    const roll = Math.random();
+    let logMsg = "";
 
-  // 2-3、计算等级和品质影响因子
-  // 角色达到5级后，等级因子恒定为1，不再受等级压制
-  const levelFactor = playerLevel >= 5 ? 1 : (0.2 + (playerLevel / 5) * 0.8);
-  // 品质因子：基于材料总价值
-  const qualityFactor = 0.5 + (totalMaterialValue / 9) * 0.5;
-  // 基础收益系数（用于生命/攻击/防御）
-  const levelMultiplier = 1 + (playerLevel - 1) * 0.15;
-
-  const selectedStats: Stat[] = selectedKeys.map(typeKey => {
-    const config = STAT_CONFIG[typeKey];
-    const randomBoost = 0.8 + Math.random() * 0.4;
-    let finalValue = 0;
-
-    if (typeKey === 'CRIT' || typeKey === 'LIFESTEAL') {
-      // 优化吸血和暴击属性：受等级(5级前)和材料品质影响
-      const maxVal = typeKey === 'CRIT' ? 20 : 10;
-      // 计算逻辑：最大值 * 等级因子 * 品质因子 * 随机浮动
-      finalValue = Math.ceil(maxVal * levelFactor * qualityFactor * randomBoost);
-      // 4、设置属性上限
-      finalValue = Math.min(maxVal, finalValue);
+    if (roll < 0.25 * debuffChanceMult) {
+        newSession.activeDebuff = 'HARDENED';
+        logMsg = `淬火：耐久+${heal}，但材料变硬了！(下次消耗翻倍)`;
+    } else if (roll < 0.50 * debuffChanceMult) {
+        newSession.activeDebuff = 'DULLED';
+        logMsg = `淬火：耐久+${heal}，但表面钝化！(下次收益减半)`;
+    } else if (roll < 0.70 * debuffChanceMult) {
+        const penalty = Math.floor(session.qualityScore * 0.2); 
+        newSession.qualityScore = Math.max(0, newSession.qualityScore - penalty);
+        logMsg = `淬火：耐久+${heal}，但冷却过快导致开裂！(品质 -${penalty})`;
+        newSession.activeDebuff = null;
+    } else if (roll < 0.90 * debuffChanceMult) {
+        const penalty = 20; 
+        newSession.progress = Math.max(0, newSession.progress - penalty);
+        logMsg = `淬火：耐久+${heal}，但形变回退了！(进度 -${penalty}%)`;
+        newSession.activeDebuff = null;
     } else {
-      // 普通属性：受等级收益系数影响
-      const baseValue = (config.base + config.scale * totalMaterialValue) * levelMultiplier;
-      finalValue = Math.floor(baseValue * randomBoost);
+        logMsg = `淬火：完美冷却！耐久+${heal}，没有任何副作用。`;
+        if (effFrost) logMsg += ' [冰棱镜守护]';
+        newSession.activeDebuff = null;
     }
     
+    newSession.quenchCooldown = FORGE_ACTIONS.QUENCH.cooldown;
+    if (effFrost) newSession.quenchCooldown -= 1;
+    newSession.logs = [logMsg, ...session.logs];
+    return newSession;
+  }
+
+  const config = action === 'LIGHT' ? FORGE_ACTIONS.LIGHT : FORGE_ACTIONS.HEAVY;
+  let scoreMult = 1;
+  let statusLog = '';
+
+  if (session.activeDebuff === 'DULLED') {
+      scoreMult = 0.5;
+      statusLog = ' [钝化:收益减半]';
+      newSession.activeDebuff = null; 
+  } else if (session.activeDebuff === 'HARDENED') {
+      // Handled in calculateCost
+      statusLog = ' [硬化:消耗翻倍]';
+      newSession.activeDebuff = null;
+  }
+
+  if (effBerserk && (session.currentDurability / session.maxDurability) < 0.3) {
+      scoreMult *= 1.5;
+      statusLog += ' [狂战]';
+  }
+
+  let actualCost = calculateCost(config.baseCost);
+
+  if (effAmber && session.turnCount < effAmber.effectValue) {
+      actualCost = 0;
+      statusLog += ' [琥珀免耗]';
+  } else if (action === 'HEAVY' && effGravity && Math.random() < effGravity.effectValue) {
+      actualCost = 0;
+      statusLog += ' [浮空石免耗]';
+  }
+
+  newSession.currentDurability -= actualCost;
+  newSession.durabilitySpent += actualCost;
+
+  if (newSession.currentDurability <= 0) {
+    newSession.status = 'FAILURE';
+    newSession.logs = [`耐久耗尽！装备崩解了...`, ...session.logs];
+    return newSession;
+  }
+
+  let bloodstoneBonus = 0;
+  if (effBlood) {
+      const threshold = 20;
+      const prevSpent = session.durabilitySpent;
+      const currSpent = newSession.durabilitySpent;
+      const steps = Math.floor(currSpent / threshold) - Math.floor(prevSpent / threshold);
+      if (steps > 0) {
+          bloodstoneBonus = steps * effBlood.effectValue;
+          statusLog += ` [血燃+${bloodstoneBonus}]`;
+      }
+  }
+
+  const [minP, maxP] = config.progressRange;
+  let progressGain = Math.floor(Math.random() * (maxP - minP + 1)) + minP;
+  
+  const [minS, maxS] = config.scoreRange;
+  let baseScore = Math.floor(Math.random() * (maxS - minS + 1)) + minS;
+
+  if (action === 'LIGHT' && effMithril) {
+      baseScore *= 1.5;
+      progressGain = Math.floor(progressGain * 0.8);
+      statusLog += ' [秘银:高分慢锻]';
+  }
+  if (action === 'HEAVY' && effImpact) {
+      progressGain = Math.floor(progressGain * 1.5);
+      baseScore *= 0.8;
+      statusLog += ' [崩山:速通]';
+  }
+
+  let hitCount = 1;
+  if (action === 'LIGHT' && effEcho && Math.random() < effEcho.effectValue) {
+      hitCount = 2;
+      statusLog += ' [回响连击!]';
+  }
+
+  let totalScoreGain = 0;
+  let totalProgressGain = 0;
+
+  for(let i=0; i<hitCount; i++) {
+      totalProgressGain += progressGain;
+      let hitScore = Math.floor(baseScore * session.scoreMultiplier * levelScale * scoreMult);
+      if (effCrit && Math.random() < effCrit.effectValue) {
+          hitScore *= 2;
+          statusLog += ' [暴击!]';
+      }
+      totalScoreGain += hitScore;
+  }
+
+  // Momentum Logic: Heavy adds 1 stack
+  if (action === 'HEAVY') {
+      newSession.momentum += 1;
+      statusLog += ` [重势+1]`;
+  }
+
+  totalScoreGain += bloodstoneBonus;
+  newSession.progress = Math.min(100, newSession.progress + totalProgressGain);
+  newSession.qualityScore += totalScoreGain;
+
+  newSession.logs = [`${config.name}：进度 +${totalProgressGain}%，品质分 +${totalScoreGain}${statusLog}`, ...session.logs];
+
+  return newSession;
+};
+
+export const completeForgeSession = (session: ForgeSession): ForgeSession => {
     return {
-      type: typeKey,
-      label: config.label,
-      value: finalValue,
-      suffix: config.suffix
+        ...session,
+        status: 'SUCCESS',
+        logs: [`锻造完成！最终品质分：${session.qualityScore}`, ...session.logs]
     };
-  });
+};
+
+export const finalizeForge = (session: ForgeSession, type: EquipmentType, playerLevel: number): Equipment => {
+  const { qualityScore, materials } = session;
+  const id = Math.random().toString(36).substr(2, 9);
+  
+  // 1. Quality Determination (Weighted by Materials)
+  // Sum Range: 3 (3x Common) to 9 (3x Rare)
+  const totalMaterialQuality = materials.reduce((sum, m) => sum + m.quality, 0);
+  let resultQuality = Quality.Common;
+  const roll = Math.random();
+
+  if (totalMaterialQuality <= 4) {
+      // 3-4 (Common heavy): 90% Common, 10% Refined
+      // Boost chance if score is high (>600)
+      const threshold = qualityScore > 600 ? 0.2 : 0.1;
+      resultQuality = roll < threshold ? Quality.Refined : Quality.Common;
+  } else if (totalMaterialQuality <= 7) {
+      // 5-7 (Mixed): 20% Common, 70% Refined, 10% Rare
+      // Penalize low score (<300)
+      if (qualityScore < 300) {
+           resultQuality = roll < 0.5 ? Quality.Common : Quality.Refined;
+      } else {
+           if (roll < 0.2) resultQuality = Quality.Common;
+           else if (roll < 0.9) resultQuality = Quality.Refined;
+           else resultQuality = Quality.Rare;
+      }
+  } else {
+      // 8-9 (Rare heavy): 10% Refined, 90% Rare
+      // Penalize low score (<500)
+      if (qualityScore < 500) {
+           resultQuality = roll < 0.4 ? Quality.Refined : Quality.Rare;
+      } else {
+           resultQuality = roll < 0.1 ? Quality.Refined : Quality.Rare;
+      }
+  }
+
+  // 2. Stat Count Determination
+  let statCount = 2; // Default for Common
+  const scoreFactor = Math.min(1, qualityScore / 2000); // Normalizes score impact
+
+  if (resultQuality === Quality.Refined) {
+      // Refined: 2-3 stats. Base chance 30%, boosted by score.
+      if (Math.random() < (0.3 + scoreFactor * 0.5)) statCount = 3;
+  } else if (resultQuality === Quality.Rare) {
+      // Rare: 3-4 stats. Base 3. Chance for 4 boosted by score.
+      statCount = 3;
+      if (Math.random() < (0.3 + scoreFactor * 0.5)) statCount = 4;
+  }
+
+  // 3. Stat Type Selection
+  const weaponOrder: Stat['type'][] = ['ATK', 'CRIT', 'LIFESTEAL'];
+  const armorOrder: Stat['type'][] = ['HP', 'DEF', 'LIFESTEAL'];
+  const basePool = type === 'WEAPON' ? weaponOrder : armorOrder;
+
+  // Filter out Lifesteal for Common quality
+  let pool = [...basePool];
+  if (resultQuality === Quality.Common) {
+      pool = pool.filter(s => s !== 'LIFESTEAL');
+  }
+
+  const selectedStats: Stat[] = [];
+  const shuffledPool = [...pool].sort(() => 0.5 - Math.random());
+  
+  for (let i = 0; i < statCount; i++) {
+      const typeKey = shuffledPool[i % shuffledPool.length];
+      
+      // 4. Calculate Stat Values
+      // Formula: Base * QualityMult * (1 + ScoreBonus)
+      
+      // Base: Exponential growth with level. 10 * 1.3^(Level-1)
+      const levelBase = 10 * Math.pow(1.3, playerLevel - 1);
+      
+      const qMult = resultQuality === Quality.Common ? 1.0 : resultQuality === Quality.Refined ? 1.3 : 1.6;
+      const scoreBonus = Math.min(0.5, qualityScore / 2000); // Cap bonus at 50%
+      
+      const config = STAT_CONFIG[typeKey];
+      // Normalize config base relative to ATK (10) for ratio scaling
+      const statRatio = config.base / 10;
+      
+      let finalVal = 0;
+
+      if (typeKey === 'CRIT') {
+          // Crit: Quality Base + Score Scaling
+          const baseCrit = resultQuality * 5; // 5, 10, 15
+          finalVal = baseCrit + (qualityScore / 250);
+          finalVal = Math.min(35, finalVal);
+      } else if (typeKey === 'LIFESTEAL') {
+          // Lifesteal: Hard cap 5
+          const baseLS = resultQuality === Quality.Rare ? 2 : 1;
+          finalVal = baseLS + (qualityScore / 1500);
+          finalVal = Math.min(5, finalVal);
+      } else {
+          // HP, ATK, DEF
+          finalVal = levelBase * statRatio * qMult * (1 + scoreBonus);
+          // Add randomness +/- 10%
+          finalVal *= (0.9 + Math.random() * 0.2);
+      }
+
+      selectedStats.push({
+          type: typeKey,
+          label: config.label,
+          value: Math.floor(Math.max(1, finalVal)),
+          suffix: config.suffix
+      });
+  }
+  
+  // Sort stats for consistent display order
+  const sortOrder = ['HP', 'ATK', 'DEF', 'CRIT', 'LIFESTEAL'];
+  selectedStats.sort((a, b) => sortOrder.indexOf(a.type) - sortOrder.indexOf(b.type));
 
   const namePrefix = resultQuality === Quality.Rare ? '传说' : (resultQuality === Quality.Refined ? '精炼' : '普通的');
   const typeName = type === 'WEAPON' ? '神兵' : '护甲';
-  
-  // 更新成本计算以匹配 constants.ts 中的新价格 (10, 100, 2000)
-  const materialCosts = { [Quality.Common]: 10, [Quality.Refined]: 100, [Quality.Rare]: 2000 };
-  const totalCost = materials.reduce((sum, q) => sum + materialCosts[q], 0);
-  // 调整售价系数，因为成本基数变大了，适当降低一点点倍率防止数值膨胀过快，但保证高价值
-  const saleValue = Math.floor(totalCost * (0.6 + resultQuality * 0.1) * (1 + (playerLevel - 1) * 0.05));
+  // Value calculation: quality * base + materials value
+  const saleValue = Math.floor(qualityScore * 1.2) + (totalMaterialQuality * 50);
+
+  // Combat Durability: Scale slightly with score, mostly defined by quality
+  const baseDurability = resultQuality === Quality.Rare ? 300 : (resultQuality === Quality.Refined ? 180 : 100);
+  const combatDurability = Math.floor(baseDurability * (1 + (qualityScore/5000)));
 
   return {
     id,
@@ -82,6 +414,74 @@ export const generateEquipment = (type: EquipmentType, materials: Quality[], pla
     quality: resultQuality,
     stats: selectedStats,
     value: saleValue,
-    materialsUsed: materials
+    materialsUsed: materials.map(m => m.quality),
+    score: qualityScore,
+    maxDurability: combatDurability,
+    currentDurability: combatDurability
   };
+};
+
+export const generateEquipment = (type: EquipmentType, materials: Quality[], playerLevel: number = 1, isBossDrop: boolean = false): Equipment => {
+    const fakeMaterials: Material[] = materials.map((q, i) => ({
+        id: `fake_${i}`,
+        quality: q,
+        name: '未知材料',
+        price: 0,
+        effectType: 'DURABILITY',
+        effectValue: 0,
+        description: ''
+    }));
+
+    const totalVal = materials.reduce((a,b) => a+b, 0);
+    // Simulate score based on expected quality
+    const simulatedScore = totalVal * (isBossDrop ? 150 : 80) * (0.8 + Math.random() * 0.4);
+    
+    const mockSession: ForgeSession = {
+        playerLevel,
+        maxDurability: 100, currentDurability: 100, progress: 100, 
+        qualityScore: Math.floor(simulatedScore), 
+        costModifier: 0, scoreMultiplier: 1, 
+        quenchCooldown: 0, turnCount: 0, logs: [], status: 'SUCCESS',
+        materials: fakeMaterials,
+        activeDebuff: null,
+        durabilitySpent: 0,
+        momentum: 0,
+        polishCount: 0
+    };
+    return finalizeForge(mockSession, type, playerLevel);
+};
+
+export const generateBlacksmithReward = (targetScore: number, type: EquipmentType, playerLevel: number): Equipment => {
+    // Infer likely materials from target score for reasonable quality gen
+    let estimatedQuality = Quality.Common;
+    if (targetScore > 800) estimatedQuality = Quality.Rare;
+    else if (targetScore > 300) estimatedQuality = Quality.Refined;
+
+    const fakeMaterials: Material[] = Array(3).fill(null).map((_, i) => ({
+        id: `gift_${i}`,
+        quality: estimatedQuality,
+        name: '神秘金属',
+        price: 0,
+        effectType: 'DURABILITY',
+        effectValue: 0,
+        description: '铁匠的馈赠'
+    }));
+
+    const variance = 0.9 + Math.random() * 0.2;
+    const finalScore = Math.floor(targetScore * variance);
+
+    const mockSession: ForgeSession = {
+        playerLevel,
+        maxDurability: 100, currentDurability: 100, progress: 100, 
+        qualityScore: finalScore, 
+        costModifier: 0, scoreMultiplier: 1, 
+        quenchCooldown: 0, turnCount: 0, logs: [], status: 'SUCCESS',
+        materials: fakeMaterials,
+        activeDebuff: null,
+        durabilitySpent: 0,
+        momentum: 0,
+        polishCount: 0
+    };
+
+    return finalizeForge(mockSession, type, playerLevel);
 };
