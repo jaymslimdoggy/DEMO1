@@ -2,7 +2,7 @@
 import React, { useRef, useEffect } from 'react';
 import { Player, ForgeSession, Material, Quality, EquipmentType } from '../../types';
 import { FORGE_ACTIONS } from '../../constants';
-import { FloatingText, FloatingTextLayer } from '../Shared/FloatingTextLayer.tsx';
+import { FloatingText, FloatingTextLayer } from '../Shared/FloatingTextLayer';
 
 interface ForgeViewProps {
   player: Player;

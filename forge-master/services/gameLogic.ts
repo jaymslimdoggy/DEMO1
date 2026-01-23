@@ -60,6 +60,7 @@ export const createForgeSession = (materials: Material[], playerLevel: number, u
     durabilitySpent: 0,
     momentum: 0,
     polishCount: 0,
+    unlockedTalents, // Store the list
     talents: sessionTalents
   };
 };
@@ -280,7 +281,8 @@ export const executeForgeAction = (session: ForgeSession, action: 'LIGHT' | 'HEA
   let baseScore = Math.floor(Math.random() * (maxS - minS + 1)) + minS;
 
   // Talent: Light Score Bonus
-  if (action === 'LIGHT' && unlockedTalents(session).includes('t_qual_1')) {
+  // Fix: Access session.unlockedTalents instead of calling an undefined function
+  if (action === 'LIGHT' && session.unlockedTalents && session.unlockedTalents.includes('t_qual_1')) {
       baseScore += 2;
   }
 
@@ -333,21 +335,6 @@ export const executeForgeAction = (session: ForgeSession, action: 'LIGHT' | 'HEA
   newSession.logs = [`${config.name}：进度 +${totalProgressGain}%，品质分 +${totalScoreGain}${statusLog}`, ...session.logs];
 
   return newSession;
-};
-
-// Helper to access session talents outside if needed, or re-derive
-const unlockedTalents = (s: ForgeSession) => {
-    // This is a rough check, ideal is to pass talent ID presence. 
-    // For specific Action logic that wasn't snapshotted in session.talents (like t_qual_1 flat score), 
-    // we might need to rely on what was captured or just re-add it to capture.
-    // For simplicity, let's assume t_qual_1 is small enough or we add it to snapshot if needed.
-    // Actually, let's just use a quick check logic if we want to be precise, 
-    // but better to add 'lightBaseScoreBonus' to session.talents snapshot in createForgeSession.
-    // For now, I will add a simple placeholder return since we can't easily access the string array here without passing it.
-    // Correction: I'll trust the `executeForgeAction` logic above where I added `if (action === 'LIGHT' && ...)` 
-    // Wait, executeForgeAction doesn't receive `unlockedTalents` array, only `session`.
-    // I should add `unlockedTalents` list to `ForgeSession` state to be safe.
-    return []; 
 };
 
 export const completeForgeSession = (session: ForgeSession): ForgeSession => {
@@ -517,6 +504,7 @@ export const generateEquipment = (type: EquipmentType, materials: Quality[], pla
         durabilitySpent: 0,
         momentum: 0,
         polishCount: 0,
+        unlockedTalents: [],
         talents: {
              lightCostReduction: 0, heavyCostReductionPct: 0, heavyProgressBonusPct: 0,
              polishScoreBonusPct: 0, heavyFreeChance: 0, allCostReductionPct: 0
@@ -555,6 +543,7 @@ export const generateBlacksmithReward = (targetScore: number, type: EquipmentTyp
         durabilitySpent: 0,
         momentum: 0,
         polishCount: 0,
+        unlockedTalents: [],
         talents: {
              lightCostReduction: 0, heavyCostReductionPct: 0, heavyProgressBonusPct: 0,
              polishScoreBonusPct: 0, heavyFreeChance: 0, allCostReductionPct: 0

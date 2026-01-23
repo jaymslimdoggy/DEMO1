@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Player, Equipment } from '../../types';
-import { ItemCard } from '../Shared/ItemCard.tsx';
+import { ItemCard } from '../Shared/ItemCard';
 
 interface BagViewProps {
   player: Player;

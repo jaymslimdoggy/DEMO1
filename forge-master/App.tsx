@@ -1,14 +1,15 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Player, Material, Quality, Equipment, EquipmentType, ForgeSession, Blessing, BlessingTier, EventOption, DungeonState } from './types';
 import { MATERIALS, INITIAL_GOLD, FORGE_ACTIONS, DUNGEON_CONFIG, BLESSINGS } from './constants';
 import { generateEquipment, createForgeSession, executeForgeAction, finalizeForge, completeForgeSession, generateBlacksmithReward } from './services/gameLogic';
-import { FloatingText, FloatingTextLayer } from './components/Shared/FloatingTextLayer.tsx';
-import { ItemDetailModal } from './components/Shared/ItemDetailModal.tsx';
-import { ForgeView } from './components/Views/ForgeView.tsx';
-import { ShopView } from './components/Views/ShopView.tsx';
-import { BagView } from './components/Views/BagView.tsx';
-import { DungeonView } from './components/Views/DungeonView.tsx';
-import { TalentView } from './components/Views/TalentView.tsx';
+import { FloatingText, FloatingTextLayer } from './components/Shared/FloatingTextLayer';
+import { ItemDetailModal } from './components/Shared/ItemDetailModal';
+import { ForgeView } from './components/Views/ForgeView';
+import { ShopView } from './components/Views/ShopView';
+import { BagView } from './components/Views/BagView';
+import { DungeonView } from './components/Views/DungeonView';
+import { TalentView } from './components/Views/TalentView';
 
 const App: React.FC = () => {
   const initialPlayerState: Player = {
@@ -148,6 +149,26 @@ const App: React.FC = () => {
     });
     return { durability, costRed, scoreMult };
   }, [forgeSlots, player.level, player.unlockedTalents]);
+
+  // Supply Logic Memoization
+  const supplyLogic = useMemo(() => {
+      let maxSupplies = 20; // Base Cap
+      let freeSupplies = 0;
+      let supplyUnitCost = DUNGEON_CONFIG.SUPPLY_COST;
+
+      // t_exp_2: Cap +2, Free +2
+      if (player.unlockedTalents.includes('t_exp_2')) {
+          maxSupplies += 2;
+          freeSupplies += 2;
+      }
+      // t_exp_4: Cap +5, Cost -20%
+      if (player.unlockedTalents.includes('t_exp_4')) {
+          maxSupplies += 5;
+          supplyUnitCost = Math.floor(supplyUnitCost * 0.8);
+      }
+
+      return { maxSupplies, freeSupplies, supplyUnitCost };
+  }, [player.unlockedTalents]);
 
   const addFloatingText = (text: string, type: FloatingText['type'], x: number = 0, y: number = -20) => {
     const id = ++floatingIdCounter.current;
@@ -314,12 +335,13 @@ const App: React.FC = () => {
   // --- DUNGEON PREP ---
   const openDungeonPrep = () => {
       setIsPrepMode(true);
-      // Talent: Exploration - Supplies (t_exp_2, t_exp_4)
-      let baseSupplies = 5;
-      if (player.unlockedTalents.includes('t_exp_2')) baseSupplies = 7;
-      if (player.unlockedTalents.includes('t_exp_4')) baseSupplies += 5;
-
-      setPrepSupplies(baseSupplies); 
+      // Determine default value based on what feels right (Base 5 + Free 2 if applicable)
+      // If we have free supplies, default selection should probably include them.
+      let baseSelection = 5; 
+      if (supplyLogic.freeSupplies > 0) {
+          baseSelection += supplyLogic.freeSupplies;
+      }
+      setPrepSupplies(baseSelection); 
       setPrepBlessing(null);
   };
 
@@ -334,13 +356,12 @@ const App: React.FC = () => {
   };
 
   const launchDungeon = () => {
-      // Talent: Exploration - Supply Cost (t_exp_4)
-      let supplyCostPerUnit = DUNGEON_CONFIG.SUPPLY_COST;
-      if (player.unlockedTalents.includes('t_exp_4')) {
-          supplyCostPerUnit = Math.floor(supplyCostPerUnit * 0.8);
-      }
+      const { freeSupplies, supplyUnitCost } = supplyLogic;
 
-      const supplyCost = prepSupplies * supplyCostPerUnit;
+      // Calculate paid supplies: anything above the free amount
+      const paidSupplies = Math.max(0, prepSupplies - freeSupplies);
+      const supplyCost = paidSupplies * supplyUnitCost;
+
       const portalCost = selectedStartFloor === 1 ? 0 : selectedStartFloor * 10;
       const blessingCost = prepBlessing ? [0, 200, 800, 2000][prepBlessing.tier] : 0;
       const totalCost = supplyCost + portalCost + blessingCost;
@@ -939,6 +960,7 @@ const App: React.FC = () => {
               prepBlessing={prepBlessing}
               selectedStartFloor={selectedStartFloor}
               floatingTexts={floatingTexts}
+              supplyLogic={supplyLogic} // Pass the calculated supply logic (max, free, cost)
               onOpenPrep={openDungeonPrep}
               onClosePrep={() => setIsPrepMode(false)}
               onSetPrepSupplies={setPrepSupplies}

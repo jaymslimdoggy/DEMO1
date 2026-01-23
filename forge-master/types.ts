@@ -173,6 +173,9 @@ export interface ForgeSession {
   momentum: number; // New: Stacks of "Heavy Momentum"
   polishCount: number; // New: Number of times Polished
   
+  // Store the raw list of unlocked talent IDs so logic can check specific ones (like t_qual_1)
+  unlockedTalents: string[];
+
   // Talent snapshots for session
   talents: {
       lightCostReduction: number; // Flat

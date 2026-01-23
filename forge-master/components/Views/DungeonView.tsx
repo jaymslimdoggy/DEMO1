@@ -2,7 +2,7 @@
 import React, { useRef, useEffect } from 'react';
 import { Player, DungeonState, BlessingTier, Blessing } from '../../types';
 import { DUNGEON_CONFIG } from '../../constants';
-import { FloatingText, FloatingTextLayer } from '../Shared/FloatingTextLayer.tsx';
+import { FloatingText, FloatingTextLayer } from '../Shared/FloatingTextLayer';
 
 interface DungeonViewProps {
   player: Player;
@@ -12,6 +12,7 @@ interface DungeonViewProps {
   prepBlessing: Blessing | null;
   selectedStartFloor: number;
   floatingTexts: FloatingText[];
+  supplyLogic: { maxSupplies: number, freeSupplies: number, supplyUnitCost: number }; // New prop
   onOpenPrep: () => void;
   onClosePrep: () => void;
   onSetPrepSupplies: (v: number) => void;
@@ -35,6 +36,7 @@ export const DungeonView: React.FC<DungeonViewProps> = ({
   prepBlessing,
   selectedStartFloor,
   floatingTexts,
+  supplyLogic, // Used for prep calculation display
   onOpenPrep,
   onClosePrep,
   onSetPrepSupplies,
@@ -57,6 +59,9 @@ export const DungeonView: React.FC<DungeonViewProps> = ({
     }, [dungeon?.log]);
 
     const currentFloorIndex = player.unlockedFloors.indexOf(selectedStartFloor);
+
+    // Calculate current cost for display
+    const currentSupplyCost = Math.max(0, prepSupplies - supplyLogic.freeSupplies) * supplyLogic.supplyUnitCost;
 
     if (!dungeon) {
         return (
@@ -115,12 +120,15 @@ export const DungeonView: React.FC<DungeonViewProps> = ({
 
                              {/* Supplies */}
                              <div className="bg-zinc-900 rounded-2xl p-6 border border-zinc-700">
-                                 <div className="flex justify-between items-center mb-4"><div className="text-lg font-black text-white"><i className="fas fa-bread-slice text-orange-400 mr-2"></i>行军干粮</div><div className="text-orange-400 font-mono font-bold text-lg">{DUNGEON_CONFIG.SUPPLY_COST} G / 份</div></div>
+                                 <div className="flex justify-between items-center mb-4"><div className="text-lg font-black text-white"><i className="fas fa-bread-slice text-orange-400 mr-2"></i>行军干粮</div><div className="text-orange-400 font-mono font-bold text-lg">{supplyLogic.supplyUnitCost} G / 份</div></div>
                                  <div className="flex items-center gap-4 bg-zinc-950 p-3 rounded-xl border border-zinc-800">
-                                     <input type="range" min="0" max="20" value={prepSupplies} onChange={e => onSetPrepSupplies(Number(e.target.value))} className="flex-1 accent-orange-500 h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer"/>
+                                     <input type="range" min="0" max={supplyLogic.maxSupplies} value={prepSupplies} onChange={e => onSetPrepSupplies(Number(e.target.value))} className="flex-1 accent-orange-500 h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer"/>
                                      <div className="w-16 text-center font-black text-3xl text-yellow-500">{prepSupplies}</div>
                                  </div>
-                                 <div className="text-sm text-zinc-400 mt-3 text-right font-bold">小计: <span className="text-yellow-500 text-xl font-black">{prepSupplies * DUNGEON_CONFIG.SUPPLY_COST}</span> G</div>
+                                 <div className="flex justify-between items-center mt-3">
+                                     {supplyLogic.freeSupplies > 0 && <span className="text-xs font-bold text-green-500 bg-green-900/30 px-2 py-1 rounded border border-green-900/50">含 {supplyLogic.freeSupplies} 份免费干粮</span>}
+                                     <div className="text-sm text-zinc-400 text-right font-bold ml-auto">小计: <span className="text-yellow-500 text-xl font-black">{currentSupplyCost}</span> G</div>
+                                 </div>
                              </div>
 
                              {/* Blessings */}
@@ -145,7 +153,7 @@ export const DungeonView: React.FC<DungeonViewProps> = ({
                          </div>
 
                          <div className="p-6 border-t border-zinc-700 bg-zinc-900 flex justify-between items-center shrink-0">
-                             <div className="text-left"><div className="text-xs text-zinc-500 font-bold uppercase tracking-wider">预计总花费</div><div className="text-4xl font-black text-yellow-500">{(selectedStartFloor * 10) + (prepSupplies * DUNGEON_CONFIG.SUPPLY_COST) + (prepBlessing ? [0, 200, 800, 2000][prepBlessing.tier] : 0)} G</div></div>
+                             <div className="text-left"><div className="text-xs text-zinc-500 font-bold uppercase tracking-wider">预计总花费</div><div className="text-4xl font-black text-yellow-500">{(selectedStartFloor * 10) + currentSupplyCost + (prepBlessing ? [0, 200, 800, 2000][prepBlessing.tier] : 0)} G</div></div>
                              <button onClick={onLaunchDungeon} className="px-10 py-5 bg-green-600 hover:bg-green-500 text-white font-black rounded-2xl text-2xl shadow-lg transition active:scale-95">出发</button>
                          </div>
                      </div>
@@ -251,7 +259,7 @@ export const DungeonView: React.FC<DungeonViewProps> = ({
                             <div className="text-red-500 text-xl mt-0.5"><i className="fas fa-exclamation-triangle"></i></div>
                             <div>
                                 <div className="text-xs font-black text-red-400 uppercase tracking-wider">物资耗尽</div>
-                                <div className="text-[10px] text-red-300/80 leading-tight mt-0.5">攻击力降低 20%<br/>前进将扣除生命</div>
+                                <div className="text-[10px] text-red-300/80 leading-tight mt-0.5">攻击力降低 20%<br/>前进将扣除5%生命</div>
                             </div>
                         </div>
                     )}
