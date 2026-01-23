@@ -1,23 +1,16 @@
 
 <!DOCTYPE html>
 <html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="mobile-web-app-capable" content="yes">
     <title>锻造大师</title>
-    
-    <!-- 基础依赖 -->
+    <!-- Keeping CDN for Tailwind and FontAwesome for simplicity in this migration -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- React & Babel 运行时编译支持 -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
     <style>
         :root {
             --safe-area-inset-bottom: env(safe-area-inset-bottom);
@@ -37,23 +30,6 @@
         .quality-1 { color: #ffffff; text-shadow: 0 0 5px rgba(255,255,255,0.3); }
         .quality-2 { color: #4ade80; text-shadow: 0 0 5px rgba(74,222,128,0.3); }
         .quality-3 { color: #facc15; text-shadow: 0 0 10px rgba(250,204,21,0.5); }
-        .bg-quality-1 { background-color: #333; border: 1px solid #666; }
-        .bg-quality-2 { background-color: #064e3b; border: 1px solid #059669; }
-        .bg-quality-3 { background-color: #451a03; border: 1px solid #d97706; }
-        .forge-slot {
-            width: 80px;
-            height: 80px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 2px dashed #444;
-            border-radius: 8px;
-            transition: all 0.3s;
-        }
-        .forge-slot.filled {
-            border: 2px solid #666;
-            background: #2a2a2a;
-        }
         .text-stroke {
             -webkit-text-stroke: 1px rgba(0,0,0,0.8);
             text-shadow: 0 2px 4px rgba(0,0,0,0.5);
@@ -67,55 +43,60 @@
         .animate-floatUp {
             animation: floatUp 1s ease-out forwards;
         }
-        .stat-card {
-            background: linear-gradient(145deg, #262626, #1f1f1f);
-            box-shadow: 5px 5px 10px #171717, -5px -5px 10px #2d2d2d;
+        @keyframes bounceIn {
+            0% { transform: scale(0.3); opacity: 0; }
+            50% { transform: scale(1.05); opacity: 1; }
+            70% { transform: scale(0.9); }
+            100% { transform: scale(1); }
         }
-        nav {
-            padding-bottom: calc(0.5rem + var(--safe-area-inset-bottom)) !important;
+        .animate-bounce-in {
+            animation: bounceIn 0.5s cubic-bezier(0.215, 0.610, 0.355, 1.000);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .animate-fadeIn {
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+        .animate-slideUp {
+            animation: slideUp 0.3s ease-out forwards;
+        }
+        
+        /* Custom Scrollbar */
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 6px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.2);
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.3);
         }
     </style>
-<script type="importmap">
+  <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@^19.2.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/"
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "vite": "https://esm.sh/vite@^7.3.1"
   }
 }
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-<body>
+  <body>
     <div id="root"></div>
-
-    <!-- 配置 Babel 转换 -->
-    <script type="text/babel" data-presets="react,typescript">
-        // 定义一个简单的模块加载器，因为 Babel standalone 不会自动处理外部文件导入
-        // 我们通过这种方式直接把逻辑整合到主入口，或者你可以将 App.tsx 改为 inline
-    </script>
-
-    <!-- 主入口，通过 Babel 实时处理 TypeScript 和 JSX -->
-    <script type="text/babel" data-presets="react,typescript">
-        // 直接从 esm.sh 导入 React
-        import React, { useState, useMemo, useEffect, useRef } from 'https://esm.sh/react@18';
-        import ReactDOM from 'https://esm.sh/react-dom@18/client';
-
-        // 重新定义关键常量和组件逻辑，确保单文件加载
-        // 这里的代码将直接引用你项目中的 App.tsx 逻辑
-        // 由于 Vercel 上文件路径的问题，我们将主要的 App 逻辑在这里引用
-    </script>
-    
-    <!-- 最终解决方案：使用 esm.sh 的 bundle 模式直接加载 index.tsx -->
-    <script type="module">
-        import React from 'https://esm.sh/react@18';
-        import ReactDOM from 'https://esm.sh/react-dom@18/client';
-        // 使用 ?bundle 确保所有依赖（App, types, constants）被一次性打包加载
-        import App from './App.tsx?bundle';
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(React.createElement(App));
-    </script>
-<script type="module" src="/index.tsx"></script>
-</body>
+    <script type="module" src="/index.tsx"></script>
+  </body>
 </html>

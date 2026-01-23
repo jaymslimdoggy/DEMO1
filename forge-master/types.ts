@@ -68,6 +68,7 @@ export interface Player {
   equippedArmor: Equipment | null;
   maxDungeonDepth: number;
   unlockedFloors: number[];
+  unlockedTalents: string[]; // New: List of unlocked talent IDs
   baseStats: {
     HP: number;
     ATK: number;
@@ -87,6 +88,20 @@ export interface Blessing {
   type: BlessingType;
   value: number; // Percentage or Flat value
   description: string;
+}
+
+// New: Talent System
+export type TalentBranch = 'DURABILITY' | 'QUALITY' | 'EXPLORATION';
+
+export interface TalentNode {
+  id: string;
+  branch: TalentBranch;
+  tier: number;
+  name: string;
+  description: string;
+  cost: number;
+  reqLevel: number;
+  parentId?: string; // Optional parent ID for dependency
 }
 
 // New: Event Choices
@@ -157,4 +172,14 @@ export interface ForgeSession {
   durabilitySpent: number;
   momentum: number; // New: Stacks of "Heavy Momentum"
   polishCount: number; // New: Number of times Polished
+  
+  // Talent snapshots for session
+  talents: {
+      lightCostReduction: number; // Flat
+      heavyCostReductionPct: number; // Pct
+      heavyProgressBonusPct: number; // Pct
+      polishScoreBonusPct: number; // Pct
+      heavyFreeChance: number; // Pct
+      allCostReductionPct: number; // Pct
+  }
 }

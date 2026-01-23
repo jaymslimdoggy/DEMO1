@@ -1,5 +1,5 @@
 
-import { Material, Quality, Blessing } from './types';
+import { Material, Quality, Blessing, TalentNode } from './types';
 
 export const MATERIALS: Material[] = [
   // ... (Existing Materials unchanged, copying mostly for context) ...
@@ -98,3 +98,30 @@ export const FORGE_ACTIONS = {
     description: '消耗重势，大幅增分。次数越多效果越差'
   }
 };
+
+export const TALENT_TREE: TalentNode[] = [
+    // Tier 1 (Level 1)
+    { id: 't_dur_1', branch: 'DURABILITY', tier: 1, name: '铁砧加固 I', description: '锻造初始耐久 +10', cost: 500, reqLevel: 1 },
+    { id: 't_qual_1', branch: 'QUALITY', tier: 1, name: '精准锤击 I', description: '【轻击】基础分数 +2', cost: 500, reqLevel: 1 },
+    { id: 't_exp_1', branch: 'EXPLORATION', tier: 1, name: '扩容背囊 I', description: '战利品背包 +2 格', cost: 500, reqLevel: 1 },
+
+    // Tier 2 (Level 3)
+    { id: 't_dur_2', branch: 'DURABILITY', tier: 2, parentId: 't_dur_1', name: '省力杠杆', description: '【重锤】耐久消耗 -10%', cost: 1500, reqLevel: 3 },
+    { id: 't_qual_2', branch: 'QUALITY', tier: 2, parentId: 't_qual_1', name: '势大力沉', description: '【重锤】进度获取 +15%', cost: 1500, reqLevel: 3 },
+    { id: 't_exp_2', branch: 'EXPLORATION', tier: 2, parentId: 't_exp_1', name: '行军干粮 I', description: '初始补给上限 +2 (且自带2份)', cost: 1500, reqLevel: 3 },
+
+    // Tier 3 (Level 5)
+    { id: 't_dur_3', branch: 'DURABILITY', tier: 3, parentId: 't_dur_2', name: '冷却槽优化', description: '【轻击】耐久消耗 -1', cost: 4000, reqLevel: 5 },
+    { id: 't_qual_3', branch: 'QUALITY', tier: 3, parentId: 't_qual_2', name: '独具匠心 I', description: '最终品质倍率 +10%', cost: 4000, reqLevel: 5 },
+    { id: 't_exp_3', branch: 'EXPLORATION', tier: 3, parentId: 't_exp_2', name: '贪婪之握', description: '战利品背包 +3 格', cost: 4000, reqLevel: 5 },
+
+    // Tier 4 (Level 10)
+    { id: 't_dur_4', branch: 'DURABILITY', tier: 4, parentId: 't_dur_3', name: '合金砧座', description: '锻造初始耐久 +25', cost: 10000, reqLevel: 10 },
+    { id: 't_qual_4', branch: 'QUALITY', tier: 4, parentId: 't_qual_3', name: '光辉打磨', description: '【打磨】基础分数 +20%', cost: 10000, reqLevel: 10 },
+    { id: 't_exp_4', branch: 'EXPLORATION', tier: 4, parentId: 't_exp_3', name: '后勤专家', description: '补给价格 -20%，上限 +5', cost: 10000, reqLevel: 10 },
+
+    // Tier 5 (Level 15)
+    { id: 't_dur_5', branch: 'DURABILITY', tier: 5, parentId: 't_dur_4', name: '永动结构', description: '所有操作消耗 -15%', cost: 30000, reqLevel: 15 },
+    { id: 't_qual_5', branch: 'QUALITY', tier: 5, parentId: 't_qual_4', name: '神之手', description: '品质倍率 +25%，重锤10%概率免耗', cost: 30000, reqLevel: 15 },
+    { id: 't_exp_5', branch: 'EXPLORATION', tier: 5, parentId: 't_exp_4', name: '虚空行囊', description: '背包 +5 格，副本金币 +20%', cost: 30000, reqLevel: 15 },
+];
