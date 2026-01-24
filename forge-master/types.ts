@@ -5,24 +5,21 @@ export enum Quality {
   Rare = 3
 }
 
-export const QualityNames = {
-  [Quality.Common]: '普通',
-  [Quality.Refined]: '精炼',
-  [Quality.Rare]: '传说'
-};
-
-export const QualityColors = {
-  [Quality.Common]: 'white',
-  [Quality.Refined]: '#4ade80',
-  [Quality.Rare]: '#facc15'
-};
-
 export type MaterialEffectType = 
-  | 'DURABILITY' | 'COST_REDUCTION' | 'SCORE_MULT' 
-  | 'SPECIAL_HEAVY_FREE' | 'SPECIAL_LIGHT_MULTI' | 'SPECIAL_CRIT' 
-  | 'SPECIAL_LIGHT_SCORE' | 'SPECIAL_HEAVY_PROGRESS' | 'SPECIAL_POLISH_BUFF' 
-  | 'SPECIAL_SPEND_BONUS' | 'SPECIAL_LOW_DURABILITY' | 'SPECIAL_QUENCH_BUFF' 
-  | 'SPECIAL_START_FREE';
+  | 'DURABILITY' 
+  | 'COST_REDUCTION' 
+  | 'SCORE_MULT'
+  | 'SPECIAL_HEAT_TO_SCORE'
+  | 'SPECIAL_HEAT_RESIST'
+  | 'SPECIAL_QUENCH_FOCUS'
+  | 'SPECIAL_LIGHT_NO_HEAT'
+  | 'SPECIAL_COMBO_REGEN'
+  | 'SPECIAL_FOCUS_BUFF'
+  | 'SPECIAL_BLOOD_PACT'
+  | 'SPECIAL_DEATH_SAVE'
+  | 'SPECIAL_POLISH_BUFF'
+  | 'SPECIAL_MIRACLE'
+  | 'SPECIAL_LIGHT_MULTIHIT'; // New Effect
 
 export interface Material {
   id: string;
@@ -33,16 +30,17 @@ export interface Material {
   effectValue: number;
   description: string;
   isDungeonOnly?: boolean;
+  isRareBase?: boolean; // New flag to hide rare base mats from static shop
 }
 
+export type EquipmentType = 'WEAPON' | 'ARMOR';
+
 export interface Stat {
-  type: 'HP' | 'ATK' | 'DEF' | 'CRIT' | 'LIFESTEAL';
+  type: string;
   label: string;
   value: number;
   suffix: string;
 }
-
-export type EquipmentType = 'WEAPON' | 'ARMOR';
 
 export interface Equipment {
   id: string;
@@ -52,9 +50,9 @@ export interface Equipment {
   stats: Stat[];
   value: number;
   materialsUsed: Quality[];
-  score?: number;
-  maxDurability: number;     // New: Max durability for combat
-  currentDurability: number; // New: Current durability
+  score: number;
+  maxDurability: number;
+  currentDurability: number;
 }
 
 export interface Player {
@@ -68,7 +66,8 @@ export interface Player {
   equippedArmor: Equipment | null;
   maxDungeonDepth: number;
   unlockedFloors: number[];
-  unlockedTalents: string[]; // New: List of unlocked talent IDs
+  unlockedTalents: string[];
+  maxScore: number;
   baseStats: {
     HP: number;
     ATK: number;
@@ -76,40 +75,72 @@ export interface Player {
     CRIT: number;
     LIFESTEAL: number;
   };
+  // Shop State - 3 Slots
+  shopSlots: {
+      item: Material;
+      soldOut: boolean;
+  }[];
+  itemsSoldSinceRestock: number;
+  hasSeenForgeTutorial?: boolean;
 }
 
-// New: Blessing System
+export interface ForgeSession {
+  playerLevel: number;
+  maxDurability: number;
+  currentDurability: number;
+  progress: number;
+  qualityScore: number;
+  costModifier: number;
+  scoreMultiplier: number;
+  turnCount: number;
+  logs: string[];
+  status: 'ACTIVE' | 'SUCCESS' | 'FAILURE';
+  materials: Material[];
+  activeDebuff: string | null;
+  durabilitySpent: number;
+  temperature: number;
+  focus: number;
+  maxFocus: number;
+  polishCount: number;
+  comboActive: boolean;
+  deathSaveUsed: boolean;
+  unlockedTalents: string[];
+  talents: {
+      lightCostReduction: number;
+      heavyCostReductionPct: number;
+      heavyProgressBonusPct: number;
+      polishScoreBonusPct: number;
+      heavyFreeChance: number;
+      allCostReductionPct: number;
+  };
+}
+
 export type BlessingTier = 1 | 2 | 3;
-export type BlessingType = 'DURABILITY_SAVE' | 'SUPPLY_SAVE' | 'LOW_HP_RECOVERY' | 'BAG_EXPANSION';
 
 export interface Blessing {
   name: string;
   tier: BlessingTier;
-  type: BlessingType;
-  value: number; // Percentage or Flat value
+  type: 'BAG_EXPANSION' | 'DURABILITY_SAVE' | 'SUPPLY_SAVE' | 'LOW_HP_RECOVERY';
+  value: number;
   description: string;
 }
 
-// New: Talent System
-export type TalentBranch = 'DURABILITY' | 'QUALITY' | 'EXPLORATION';
-
 export interface TalentNode {
   id: string;
-  branch: TalentBranch;
+  branch: 'DURABILITY' | 'QUALITY' | 'EXPLORATION';
   tier: number;
   name: string;
   description: string;
   cost: number;
   reqLevel: number;
-  parentId?: string; // Optional parent ID for dependency
+  parentId?: string;
 }
 
-// New: Event Choices
 export interface EventOption {
   label: string;
-  action: () => void;
-  style?: string; // CSS class
+  style?: string;
   disabled?: boolean;
+  action: () => void;
 }
 
 export interface DungeonState {
@@ -122,26 +153,27 @@ export interface DungeonState {
     inventory: Equipment[];
     exp: number;
   };
-  supplies: number; // New: Current supplies
-  maxBagCapacity: number; // New: 15 + blessing
-  blessing: Blessing | null; // New: Active blessing
-  streak: number; // New: Floors cleared in this run
-  starvationDebuff: boolean; // New: Has ATK been reduced?
-  
+  supplies: number;
+  maxBagCapacity: number;
+  blessing: Blessing | null;
+  streak: number;
+  starvationDebuff: boolean;
   log: string[];
   isDead: boolean;
-  isProcessing?: boolean;
   currentEvent: string;
   lastHealDepth: number;
-  lastEventResult?: { icon: string; title: string; desc: string; color: string } | null;
-  
-  // Interactive Event
+  lastEventResult: {
+    icon: string;
+    title: string;
+    desc: string;
+    color: string;
+  } | null;
+  isProcessing?: boolean;
   activeChoice?: {
-      title: string;
-      desc: string;
-      options: EventOption[];
+    title: string;
+    desc: string;
+    options: EventOption[];
   };
-
   battle?: {
     monsterName: string;
     monsterMaxHP: number;
@@ -151,38 +183,4 @@ export interface DungeonState {
     isFinished: boolean;
     victory: boolean;
   };
-}
-
-export type ForgeDebuff = 'HARDENED' | 'DULLED';
-
-export interface ForgeSession {
-  playerLevel: number;
-  maxDurability: number;
-  currentDurability: number;
-  progress: number;
-  qualityScore: number;
-  costModifier: number; // Now represents total percentage reduction (e.g., 0.2 for 20%)
-  scoreMultiplier: number;
-  quenchCooldown: number;
-  turnCount: number;
-  logs: string[];
-  status: 'ACTIVE' | 'SUCCESS' | 'FAILURE';
-  materials: Material[];
-  activeDebuff: ForgeDebuff | null;
-  durabilitySpent: number;
-  momentum: number; // New: Stacks of "Heavy Momentum"
-  polishCount: number; // New: Number of times Polished
-  
-  // Store the raw list of unlocked talent IDs so logic can check specific ones (like t_qual_1)
-  unlockedTalents: string[];
-
-  // Talent snapshots for session
-  talents: {
-      lightCostReduction: number; // Flat
-      heavyCostReductionPct: number; // Pct
-      heavyProgressBonusPct: number; // Pct
-      polishScoreBonusPct: number; // Pct
-      heavyFreeChance: number; // Pct
-      allCostReductionPct: number; // Pct
-  }
 }

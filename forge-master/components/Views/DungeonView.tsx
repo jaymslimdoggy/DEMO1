@@ -62,15 +62,37 @@ export const DungeonView: React.FC<DungeonViewProps> = ({
 
     // Calculate current cost for display
     const currentSupplyCost = Math.max(0, prepSupplies - supplyLogic.freeSupplies) * supplyLogic.supplyUnitCost;
+    
+    // Drop Rate Bonus Calculation (Visual Only)
+    const rareChanceBonus = dungeon ? Math.min(1.0, dungeon.depth / 30.0) : 0;
+    const dropRateBonus = Math.floor(rareChanceBonus * 100);
 
     if (!dungeon) {
         return (
-             <div className="h-full flex flex-col items-center justify-center animate-fadeIn bg-zinc-900 p-8 rounded-2xl border border-zinc-700 relative overflow-hidden">
+             <div className="h-full flex flex-col items-center justify-center animate-fadeIn bg-zinc-950 p-8 rounded-2xl border border-red-900/30 relative overflow-hidden">
                  <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')] opacity-30"></div>
+                 <div className="absolute inset-0 bg-gradient-to-b from-red-950/20 to-black/80 pointer-events-none"></div>
                  
                  {!isPrepMode ? (
                      <div className="z-10 text-center max-w-lg w-full flex flex-col h-full justify-center">
-                         <div className="mb-auto mt-8"><i className="fas fa-dungeon text-8xl text-zinc-700 mb-6 block animate-pulse"></i><h2 className="text-5xl font-black text-white mb-4 uppercase tracking-widest">深渊远征</h2></div>
+                         <div className="mb-auto mt-8"><i className="fas fa-dungeon text-8xl text-red-800 mb-6 block animate-pulse drop-shadow-[0_0_15px_rgba(220,38,38,0.5)]"></i><h2 className="text-5xl font-black text-red-600 mb-4 uppercase tracking-widest drop-shadow-lg">深渊远征</h2></div>
+                         
+                         <div className="bg-black/60 border border-red-900/50 p-6 rounded-xl mb-8 backdrop-blur-sm">
+                             <h3 className="text-red-500 font-bold uppercase tracking-wider mb-2 text-xl"><i className="fas fa-skull mr-2"></i> 高风险警告</h3>
+                             <p className="text-zinc-400 text-sm leading-relaxed">
+                                 进入深渊后，你必须选择合适的时机 <span className="text-white font-bold">安全撤离</span> 才能带回战利品。
+                                 <br/><br/>
+                                 <span className="text-red-500 font-black bg-red-950/50 px-2 py-1 rounded border border-red-900">若在副本中死亡，你将失去一切。</span>
+                             </p>
+                         </div>
+                         
+                         <div className="bg-purple-950/20 border border-purple-900/30 p-4 rounded-xl mb-8 backdrop-blur-sm">
+                             <div className="text-purple-400 font-bold text-sm uppercase tracking-wider mb-1">稀有掉落情报</div>
+                             <div className="text-zinc-400 text-xs">
+                                 副本会掉落各种锻造材料，随着层数深入，<br/>掉落稀有甚至 <span className="text-yellow-500 font-bold">传说材料</span> 的概率会逐步提升。
+                             </div>
+                         </div>
+
                          <button onClick={onOpenPrep} className="mb-auto w-full py-6 bg-gradient-to-r from-red-800 to-red-600 hover:from-red-700 hover:to-red-500 text-white font-black rounded-2xl text-3xl shadow-[0_0_40px_rgba(220,38,38,0.4)] transition transform active:scale-95 uppercase tracking-widest flex items-center justify-center gap-4 group"><span className="group-hover:translate-x-1 transition-transform">前往整备</span><i className="fas fa-arrow-right group-hover:translate-x-1 transition-transform"></i></button>
                      </div>
                  ) : (
@@ -120,13 +142,17 @@ export const DungeonView: React.FC<DungeonViewProps> = ({
 
                              {/* Supplies */}
                              <div className="bg-zinc-900 rounded-2xl p-6 border border-zinc-700">
-                                 <div className="flex justify-between items-center mb-4"><div className="text-lg font-black text-white"><i className="fas fa-bread-slice text-orange-400 mr-2"></i>行军干粮</div><div className="text-orange-400 font-mono font-bold text-lg">{supplyLogic.supplyUnitCost} G / 份</div></div>
+                                 <div className="flex justify-between items-center mb-4"><div className="text-lg font-black text-white"><i className="fas fa-bread-slice text-orange-400 mr-2"></i>行军补给</div><div className="text-orange-400 font-mono font-bold text-lg">{supplyLogic.supplyUnitCost} G / 份</div></div>
+                                 <div className="text-xs text-zinc-500 mb-3 bg-zinc-950/50 p-2 rounded">
+                                     <i className="fas fa-info-circle mr-1"></i>
+                                     每前进一层消耗1份补给。补给耗尽后，角色将进入<span className="text-red-400">饥饿状态</span>(攻击下降/持续扣血)。
+                                 </div>
                                  <div className="flex items-center gap-4 bg-zinc-950 p-3 rounded-xl border border-zinc-800">
                                      <input type="range" min="0" max={supplyLogic.maxSupplies} value={prepSupplies} onChange={e => onSetPrepSupplies(Number(e.target.value))} className="flex-1 accent-orange-500 h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer"/>
                                      <div className="w-16 text-center font-black text-3xl text-yellow-500">{prepSupplies}</div>
                                  </div>
                                  <div className="flex justify-between items-center mt-3">
-                                     {supplyLogic.freeSupplies > 0 && <span className="text-xs font-bold text-green-500 bg-green-900/30 px-2 py-1 rounded border border-green-900/50">含 {supplyLogic.freeSupplies} 份免费干粮</span>}
+                                     {supplyLogic.freeSupplies > 0 && <span className="text-xs font-bold text-green-500 bg-green-900/30 px-2 py-1 rounded border border-green-900/50">含 {supplyLogic.freeSupplies} 份免费补给</span>}
                                      <div className="text-sm text-zinc-400 text-right font-bold ml-auto">小计: <span className="text-yellow-500 text-xl font-black">{currentSupplyCost}</span> G</div>
                                  </div>
                              </div>
@@ -166,7 +192,6 @@ export const DungeonView: React.FC<DungeonViewProps> = ({
         <div className="absolute inset-0 z-50 bg-zinc-950 flex flex-col animate-fadeIn">
         {/* Status Header */}
         <div className="p-4 bg-zinc-900 border-b border-zinc-800 flex flex-col gap-3 shadow-lg shrink-0 z-20">
-            {/* ... (Status Header Content unchanged) ... */}
             <div className="flex justify-between items-center mb-0">
                 <div className="flex items-center gap-4 w-full">
                     <div className="bg-zinc-800 px-4 py-1 rounded-lg border border-zinc-700 flex items-center gap-2">
@@ -180,6 +205,11 @@ export const DungeonView: React.FC<DungeonViewProps> = ({
                             <span className="text-red-400 font-bold text-sm">力竭</span>
                         </div>
                     )}
+                </div>
+                {/* DROP RATE INDICATOR */}
+                <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-zinc-500 font-bold uppercase">稀有掉率</span>
+                    <span className={`text-lg font-black ${dropRateBonus > 50 ? 'text-yellow-400' : 'text-zinc-300'}`}>+{dropRateBonus}%</span>
                 </div>
             </div>
             
@@ -240,7 +270,6 @@ export const DungeonView: React.FC<DungeonViewProps> = ({
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-zinc-900 via-zinc-950 to-black opacity-50 -z-10"></div>
                 
                 {/* --- FLOATING TEXT LAYER --- */}
-                {/* Rendered inside this relative container so (0,0) is centered on the Battle/Event view */}
                 <FloatingTextLayer texts={floatingTexts} />
 
                     {/* TOP LEFT STATUS OVERLAY */}
@@ -296,7 +325,32 @@ export const DungeonView: React.FC<DungeonViewProps> = ({
                                 <div className="text-sm text-zinc-500 font-bold mt-1">正在交战...</div>
                             </div>
 
-                            {!dungeon.battle.isStarted ? <button onClick={onStartBattle} className="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-black rounded-xl text-xl shadow-lg transition active:scale-95 uppercase tracking-widest border border-red-400/20">开始战斗</button> : dungeon.battle.isFinished ? <div className="flex gap-3">{dungeon.battle.victory ? <><button onClick={() => onProceedDungeon()} className="flex-[2] py-4 bg-green-600 hover:bg-green-500 text-white font-black rounded-xl text-xl shadow-lg transition active:scale-95 border border-green-400/20">继续探索 <i className="fas fa-arrow-right ml-2"></i></button><button onClick={onWithdraw} className="flex-1 py-4 bg-yellow-600 hover:bg-yellow-500 text-white font-black rounded-xl text-lg shadow-lg transition active:scale-95 border border-yellow-400/20">撤退</button></> : <button onClick={onHandleDeath} className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 text-red-500 font-black rounded-xl text-xl shadow-lg transition active:scale-95 border border-red-900/50">你被打败了...</button>}</div> : <div className="text-center text-zinc-400 font-bold animate-pulse text-lg py-2">战斗进行中...</div>}
+                            {!dungeon.battle.isStarted ? <button onClick={onStartBattle} className="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-black rounded-xl text-xl shadow-lg transition active:scale-95 uppercase tracking-widest border border-red-400/20">开始战斗</button> : dungeon.battle.isFinished ? <div className="flex gap-3">{dungeon.battle.victory ? <><button onClick={() => onProceedDungeon()} className="flex-[2] py-4 bg-green-600 hover:bg-green-500 text-white font-black rounded-xl text-xl shadow-lg transition active:scale-95 border border-green-400/20">继续探索 <i className="fas fa-arrow-right ml-2"></i></button><button onClick={onWithdraw} className="flex-1 py-4 bg-yellow-600 hover:bg-yellow-500 text-white font-black rounded-xl text-lg shadow-lg transition active:scale-95 border border-yellow-400/20">撤退</button></> : <button onClick={onHandleDeath} className="w-full p-6 bg-zinc-950 hover:bg-zinc-900 text-red-500 rounded-2xl shadow-[0_0_30px_rgba(220,38,38,0.15)] transition active:scale-95 border-2 border-red-900/60 flex flex-col items-center gap-3 h-auto whitespace-normal group relative overflow-hidden"><div className="absolute inset-0 bg-red-900/10 group-hover:bg-red-900/20 transition-colors"></div><div className="text-3xl font-black uppercase relative z-10 flex items-center gap-3"><i className="fas fa-skull"></i> {dungeon.lastEventResult?.desc.split(' - ')[0] || '战斗失败'}</div><div className="text-lg font-bold text-zinc-500 italic leading-relaxed max-w-[95%] relative z-10 border-t border-red-900/30 pt-3 mt-1">"{dungeon.lastEventResult?.desc.split(' - ')[1] || '...'}"</div><div className="text-xs text-red-800 mt-4 font-bold uppercase tracking-[0.2em] relative z-10 opacity-70 group-hover:opacity-100 transition-opacity">点击任意处离开</div></button>}</div> : <div className="text-center text-zinc-400 font-bold animate-pulse text-lg py-2">战斗进行中...</div>}
+                        </div>
+                    ) : dungeon.isDead ? (
+                        <div className="w-full max-w-lg bg-zinc-900/90 border border-red-900 rounded-3xl p-8 backdrop-blur shadow-2xl text-center animate-bounce-in relative overflow-hidden">
+                             <div className="absolute inset-0 bg-red-950/30 animate-pulse -z-10"></div>
+                             
+                             <div className="text-7xl text-red-600 mb-6 drop-shadow-[0_0_15px_rgba(220,38,38,0.8)]"><i className="fas fa-skull"></i></div>
+                             
+                             <h2 className="text-4xl font-black text-white mb-2 uppercase tracking-widest drop-shadow-md">
+                                 {dungeon.lastEventResult ? dungeon.lastEventResult.title : '探险失败'}
+                             </h2>
+                             
+                             <div className="bg-black/40 rounded-xl p-4 border border-red-900/50 mb-8">
+                                 <div className="text-red-400 font-bold text-lg mb-2">
+                                     {dungeon.lastEventResult ? dungeon.lastEventResult.desc.split(' - ')[0] : '死因不明'}
+                                 </div>
+                                 <div className="text-zinc-400 text-sm italic">
+                                     "{dungeon.lastEventResult ? dungeon.lastEventResult.desc.split(' - ')[1] || '...' : '...'}"
+                                 </div>
+                             </div>
+
+                             <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4">战利品已全部遗失</div>
+
+                             <button onClick={onHandleDeath} className="w-full py-5 bg-gradient-to-r from-zinc-800 to-zinc-700 hover:from-zinc-700 hover:to-zinc-600 text-white font-black rounded-2xl text-xl shadow-lg transition active:scale-95 border border-zinc-600">
+                                 接受现实，返回城镇
+                             </button>
                         </div>
                     ) : (
                         <div className="text-center animate-fadeIn w-full max-w-md">

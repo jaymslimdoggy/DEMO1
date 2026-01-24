@@ -40,7 +40,7 @@ export const ItemCard: React.FC<ItemCardProps> = ({ item, onClick, onEquip, isEq
         </div>
         
         <div className="bg-black/20 rounded-lg p-2 mb-2 space-y-0.5 border border-zinc-800/30 flex-1">
-            {item.stats.slice(0, 3).map((s, i) => (
+            {item.stats.map((s, i) => (
                 <div key={i} className="flex justify-between text-xs">
                     <span className="text-zinc-500">{s.label}</span>
                     <span className="text-zinc-300">+{s.value}{s.suffix}</span>

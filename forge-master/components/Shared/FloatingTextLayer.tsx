@@ -4,7 +4,7 @@ import React from 'react';
 export interface FloatingText {
   id: number;
   text: string;
-  type: 'damage' | 'heal' | 'exp' | 'score' | 'durability_loss' | 'player_damage';
+  type: 'damage' | 'heal' | 'exp' | 'score' | 'score_crit' | 'durability_loss' | 'player_damage';
   x: number;
   y: number;
 }
@@ -19,13 +19,14 @@ export const FloatingTextLayer: React.FC<FloatingTextLayerProps> = ({ texts }) =
       {texts.map(ft => (
         <div 
            key={ft.id} 
-           className={`absolute font-black text-3xl animate-floatUp pointer-events-none text-stroke whitespace-nowrap ${
+           className={`absolute font-black animate-floatUp pointer-events-none text-stroke whitespace-nowrap ${
              ft.type === 'damage' ? 'text-yellow-400 text-4xl' : 
              ft.type === 'player_damage' ? 'text-red-600 text-4xl' :
-             ft.type === 'durability_loss' ? 'text-red-500 scale-125' : 
-             ft.type === 'heal' ? 'text-green-500' : 
+             ft.type === 'durability_loss' ? 'text-red-500 text-3xl' : 
+             ft.type === 'heal' ? 'text-green-500 text-3xl' : 
              ft.type === 'score' ? 'text-yellow-400 text-4xl drop-shadow-[0_0_10px_gold]' :
-             'text-blue-400'
+             ft.type === 'score_crit' ? 'text-amber-300 text-6xl drop-shadow-[0_0_20px_orange] z-50' :
+             'text-blue-400 text-3xl'
            }`}
            style={{ 
              transform: `translate(${ft.x}px, ${ft.y}px)`, 
